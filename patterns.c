@@ -1,6 +1,7 @@
 
 #include <stdint.h>
 
+// From https://gist.github.com/mathiasvr/19ce1d7b6caeab230934080ae1f1380e
 const uint8_t CIE[256] = {
     0,    0,    0,    0,    0,    1,    1,    1,    1,    1,    1,    1,    1,    1,    2,    2,
     2,    2,    2,    2,    2,    2,    2,    3,    3,    3,    3,    3,    3,    3,    3,    4,
@@ -27,7 +28,8 @@ int linearRampSectionMs = (7 * breathPeriodMs / 50);
 int topSectionearRampSectionMs = (7 * breathPeriodMs / 50);
 
 
-int led_periods_ms[NUM_LEDS] = {1500, 1550, 1600};
+const int led_periods_ms[NUM_LEDS] = {1500, 1550, 1600};
+/*
 void LEDBeats() {
 
   for (i = 0; i < NUM_LEDS; i++) {
@@ -46,6 +48,9 @@ void LEDBeats() {
       pwm_value = CIE[pwm_value];
     }
     analogWrite(led_pins[i], pwm_value);
+    //t1pwm_setpw(0, 65535-pwm_value);
   }
   
 }
+
+*/

@@ -76,11 +76,11 @@ void t1pwm_init( void )
 	TIM1->CHCTLR2 |= TIM_OC3M_2 | TIM_OC3M_1;
 	TIM1->CHCTLR2 |= TIM_OC4M_2 | TIM_OC4M_1;
 	
-	// Set the Capture Compare Register value to 50% initially
-	TIM1->CH1CVR = 48;
-	TIM1->CH2CVR = 48;
-	TIM1->CH3CVR = 48;
-	TIM1->CH4CVR = 48;
+	// Set the Capture Compare Register value to 0% initially
+	TIM1->CH1CVR = 65535;
+	TIM1->CH2CVR = 65535;
+	TIM1->CH3CVR = 65535;
+	TIM1->CH4CVR = 65535;
 	
 	// Enable TIM1 outputs
 	TIM1->BDTR |= TIM_MOE;
@@ -139,6 +139,7 @@ void t1pwm_force(uint8_t chl, uint8_t val)
 int main()
 {
 	uint16_t count = 15;
+	uint16_t pwm = 0;
 	
 	SystemInit();
 	Delay_Ms( 1000 );
@@ -158,10 +159,15 @@ int main()
 	printf("looping...\n\r");
 	//AFIO->PCFR1 |= GPIO_PartialRemap1_TIM1;
 	while(1) {
-		t1pwm_setpw(0, 65535-count); // Chl 1
-		Delay_Ms( 10 );
-		count = (count + 1) % 1024;
-	}
-
-	
+		
+		Delay_Us( 1000 );
+		count = (count + 1) % 2048;
+		if (count > 1024) {
+			// Make pattern symmetric at half of the period
+			pwm = 2048 - count;
+		} else {
+			pwm = count;
+		}
+		t1pwm_setpw(1, 65535-pwm); // Chl 1
+	}	
 }
