@@ -1,5 +1,8 @@
 ## Requirements
   * Have 30-50 boards designed, produced, and flashed in time for team banquet. (6 weeks)
+    * 3 weeks for board design "tape in"
+    * 2 weeks for manufacturing. Firmware is finalized at the same time
+    * 1 week for assembly
   * Under $8 each
   * Inspire students to create their own PCB designs next school year with mentor support
   * If there is power needed, the battery needs to last at least one competition or be easily rechargeable with USB
