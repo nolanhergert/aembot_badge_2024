@@ -20,7 +20,7 @@
 ### Nolan
   * You, like Ledgerwood, have an ability to dream up things that would violate assumptions. Best to get a decent way down the dreamt path to ensure other requirements are met still.
     * For example, grayscale charlieplexing is cool, but even just the firmware implementation requires much more thought in order to be low power and be de-risked. DMA engine from pre-calculated RAM buffer to GPIOs in 256-step frequency, can't use different timer channels for this!
-  * You can still have RGB addressable LEDs and low power, just have a nfet on the VCC line to the LEDs and only turn them on for .5ms at a time. Need to test more though.
+  * You can still have RGB addressable LEDs and low power, just have a nfet on the VCC line to the LEDs and only turn them on for .5ms at a time. Need to test more though (what is their startup time?)
 
 
 
