@@ -1,7 +1,6 @@
 
 #include <stdint.h>
 
-// From https://gist.github.com/mathiasvr/19ce1d7b6caeab230934080ae1f1380e
 const uint8_t CIE[256] = {
     0,    0,    0,    0,    0,    1,    1,    1,    1,    1,    1,    1,    1,    1,    2,    2,
     2,    2,    2,    2,    2,    2,    2,    3,    3,    3,    3,    3,    3,    3,    3,    4,
@@ -21,6 +20,10 @@ const uint8_t CIE[256] = {
   218,  220,  223,  225,  228,  230,  232,  235,  237,  240,  242,  245,  247,  250,  252,  255,
 };
 
+long map(long x, long in_min, long in_max, long out_min, long out_max) {
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
 #define NUM_LEDS 3
 const int led_pins[NUM_LEDS] = {9, 5, 6};
 const int breathPeriodMs = 5000;
@@ -29,7 +32,7 @@ int topSectionearRampSectionMs = (7 * breathPeriodMs / 50);
 
 
 const int led_periods_ms[NUM_LEDS] = {1500, 1550, 1600};
-/*
+uint8_t i = 0;
 void LEDBeats() {
 
   for (i = 0; i < NUM_LEDS; i++) {
@@ -45,12 +48,10 @@ void LEDBeats() {
     }
     else {
       pwm_value = map(timestamp, led_periods_ms[i] / 6, led_periods_ms[i] / 2, 0, 255);
-      pwm_value = CIE[pwm_value];
+      //pwm_value = CIE[pwm_value];
     }
-    analogWrite(led_pins[i], pwm_value);
-    //t1pwm_setpw(0, 65535-pwm_value);
+    //analogWrite(led_pins[i], pwm_value);
+    t1pwm_setpw(0, 65535-pwm_value);
   }
   
 }
-
-*/

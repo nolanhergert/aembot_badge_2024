@@ -6,6 +6,8 @@
 #include "ch32v003fun.h"
 #include <stdio.h>
 
+#define MAX_PWM_VAL 1024
+
 /*
  * initialize TIM1 for PWM
  */
@@ -32,12 +34,12 @@ void t1pwm_init( void )
 	GPIOC->CFGLR |= (GPIO_Speed_10MHz | GPIO_CNF_OUT_PP_AF)<<(4*4);
 
 
-
+/*
 	// PC0 is T1CH3 alternate mapping, 10MHz Output alt func, push-pull
 	GPIOC->CFGLR &= ~(0xf<<(4*0));
 	GPIOC->CFGLR |= (GPIO_Speed_10MHz | GPIO_CNF_OUT_PP_AF)<<(4*0);
-	//AFIO->PCFR1 |= GPIO_PartialRemap1_TIM1;
-
+	AFIO->PCFR1 |= GPIO_PartialRemap1_TIM1;
+*/
 
 		
 	// Reset TIM1 to init all regs
@@ -48,13 +50,15 @@ void t1pwm_init( void )
 	// SMCFGR: default clk input is CK_INT
 	
 	// Prescaler 
-	TIM1->PSC = 0x00;
+	TIM1->PSC = 0x6;
 	
 	// Auto Reload - sets period
-	//TIM1->ATRLR = 65535;//255;
+	TIM1->ATRLR = MAX_PWM_VAL; //65535;//255;
 	
 	// Reload immediately
-	TIM1->SWEVGR |= TIM_UG;
+	//TIM1->SWEVGR |= TIM_UG;
+	// One pulse mode, fire an interrupt when pulse finishes
+	TIM1->CTLR1 |= TIM_OPM | TIM_URS;
 	
 	// Enable CH1 output, positive pol
 	TIM1->CCER |= TIM_CC1E | TIM_CC1P;
@@ -77,10 +81,10 @@ void t1pwm_init( void )
 	TIM1->CHCTLR2 |= TIM_OC4M_2 | TIM_OC4M_1;
 	
 	// Set the Capture Compare Register value to 0% initially
-	TIM1->CH1CVR = 65535;
-	TIM1->CH2CVR = 65535;
-	TIM1->CH3CVR = 65535;
-	TIM1->CH4CVR = 65535;
+	TIM1->CH1CVR = MAX_PWM_VAL;
+	TIM1->CH2CVR = MAX_PWM_VAL;
+	TIM1->CH3CVR = MAX_PWM_VAL;
+	TIM1->CH4CVR = MAX_PWM_VAL;
 	
 	// Enable TIM1 outputs
 	TIM1->BDTR |= TIM_MOE;
@@ -104,30 +108,27 @@ void t1pwm_setpw(uint8_t chl, uint16_t width)
 }
 
 /*
- * force output (used for testing / debug)
- */
-void t1pwm_force(uint8_t chl, uint8_t val)
+// Set up an interrupt handler for the update event (counter flips to 0)
+
+void TIM1_UP_IRQHandler(void) __attribute__((interrupt));
+void TIM1_UP_IRQHandler(void)
 {
-	uint16_t temp;
-	
-	chl &= 3;
-	
-	if(chl < 2)
-	{
-		temp = TIM1->CHCTLR1;
-		temp &= ~(TIM_OC1M<<(8*chl));
-		temp |= (TIM_OC1M_2 | (val?TIM_OC1M_0:0))<<(8*chl);
-		TIM1->CHCTLR1 = temp;
-	}
-	else
-	{
-		chl &= 1;
-		temp = TIM1->CHCTLR2;
-		temp &= ~(TIM_OC1M<<(8*chl));
-		temp |= (TIM_OC1M_2 | (val?TIM_OC1M_0:0))<<(8*chl);
-		TIM1->CHCTLR2 = temp;
-	}
+	// move the compare further ahead in time.
+	// as a warning, if more than this length of time
+	// passes before triggering, you may miss your
+	// interrupt.
+	SysTick->CMP += (FUNCONF_SYSTEM_CORE_CLOCK/1000);
+
+	// clear IRQ
+	SysTick->SR = 0;
+
+	// update counter
+	systick_cnt++;
 }
+
+*/
+
+
 
 // A bit hacky, but works for my purposes for now
 #include "patterns.c"
@@ -138,7 +139,6 @@ void t1pwm_force(uint8_t chl, uint8_t val)
  */
 int main()
 {
-	uint16_t count = 15;
 	uint16_t pwm = 0;
 	
 	SystemInit();
@@ -160,14 +160,27 @@ int main()
 	//AFIO->PCFR1 |= GPIO_PartialRemap1_TIM1;
 	while(1) {
 		
-		Delay_Us( 1000 );
-		count = (count + 1) % 2048;
-		if (count > 1024) {
-			// Make pattern symmetric at half of the period
-			pwm = 2048 - count;
-		} else {
-			pwm = count;
-		}
-		t1pwm_setpw(1, 65535-pwm); // Chl 1
+		
+		pwm = (pwm + 2) % MAX_PWM_VAL;
+		t1pwm_setpw(1, MAX_PWM_VAL-pwm); // Chl 1
+		TIM1->CTLR1 |= TIM_CEN;
+
+		// Determine next values of LEDs. 
+		// Theoretically only MAX_PWM_VAL ticks available, but can 
+		// increase cpu freq if needed
+		//LEDBeats();
+		// Wait until TIM1 is done with pulse
+		// Optionally sleep CPU and have end of pulse automatically go to deep sleep?
+		while (TIM1->CTLR1 & TIM_CEN);
+		//Delay_Us( delay );
+
+		// TODO: Sleep!
+		// For now just do delay
+		t1pwm_setpw(1, MAX_PWM_VAL); // Chl 1
+		Delay_Us( 13333 );
 	}	
 }
+
+// TODO before ship:
+//  * Set prescalar for TIM1 to 0 and adjust system clock. Need to make sure millis() still works. Propose millis()?
+//  * Clean up unused code for clarity
