@@ -166,7 +166,7 @@ int main()
 		TIM1->CTLR1 |= TIM_CEN;
 
 		// Determine next values of LEDs. 
-		// Theoretically only MAX_PWM_VAL ticks available, but can 
+		// Theoretically only MAX_PWM_VAL ticks of CPU available, but can 
 		// increase cpu freq if needed
 		//LEDBeats();
 		// Wait until TIM1 is done with pulse
@@ -184,3 +184,4 @@ int main()
 // TODO before ship:
 //  * Set prescalar for TIM1 to 0 and adjust system clock. Need to make sure millis() still works. Propose millis()?
 //  * Clean up unused code for clarity
+//  * Determine if more CPU time is needed and increase CPU freq and MAX_PWM_VAL to compensate. Still want ~.4 seconds of light in the end though.
