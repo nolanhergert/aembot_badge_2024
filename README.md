@@ -11,7 +11,7 @@
 ### Nice-To-Have
   * Be understandable / modifiable by interested students. *While I would argue firmware modification is still possible, Brent disagrees*
   * Have multiple patterns
-  * Gray-scale *This complicates charlieplexing a bit. Not so much 3 LEDs though*
+  * Gray-scale, ideally more than 256 levels. *This complicates charlieplexing a bit. Not so much 3 LEDs though*
 
 ## Post-Mortem
 
