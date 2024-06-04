@@ -13,11 +13,19 @@
   * Have multiple patterns
   * Gray-scale, ideally more than 256 levels. *This complicates charlieplexing a bit. Not so much 3 LEDs though*
 
+
+## Patterns
+  * Breathing like Macbook
+  * Pulsing with beats like pendulum.
+  * Others? If students want to program one here: https://wokwi.com/projects/399273653422371841, I can translate it to the real code pretty easily.
+
+
 ## Post-Mortem
 
 
-
-## Learnings for next time
+### Tools
+  * Brent suggested using a different tool. At minimum one that has DRC for silkscreen covering pad :-) Does he have a recommendation? KiCad?
+  * Better microcontroller?
 ### Nolan
   * You, like Ledgerwood, have an ability to dream up things that would violate assumptions. Best to get a decent way down the dreamt path to ensure other requirements are met still.
     * For example, grayscale charlieplexing is cool, but even just the firmware implementation requires much more thought in order to be low power and be de-risked. DMA engine from pre-calculated RAM buffer to GPIOs in 256-step frequency, can't use different timer channels for this!
@@ -26,9 +34,5 @@
 
 
 
-## Patterns
-  * Breathing like Macbook
-  * Pulsing with beats like pendulum.
-  * Others?
 
-https://wokwi.com/projects/399273653422371841
+
