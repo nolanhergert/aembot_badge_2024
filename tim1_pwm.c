@@ -6,7 +6,85 @@
 #include "ch32v003fun.h"
 #include <stdio.h>
 
+
+
 #define MAX_PWM_VAL 1024
+
+
+#define millis()  (SysTick->CNT / DELAY_MS_TIME)
+
+const uint16_t CIE[256] = {
+    0,    0,    1,    1,    2,    2,    3,    3,    4,    4,    4,    5,    5,    6,    6,    7,
+    7,    8,    8,    8,    9,    9,   10,   10,   11,   11,   12,   12,   13,   13,   14,   15,
+   15,   16,   17,   17,   18,   19,   19,   20,   21,   22,   22,   23,   24,   25,   26,   27,
+   28,   29,   30,   31,   32,   33,   34,   35,   36,   37,   38,   39,   40,   42,   43,   44,
+   45,   47,   48,   50,   51,   52,   54,   55,   57,   58,   60,   61,   63,   65,   66,   68,
+   70,   71,   73,   75,   77,   79,   81,   83,   84,   86,   88,   90,   93,   95,   97,   99,
+  101,  103,  106,  108,  110,  113,  115,  118,  120,  123,  125,  128,  130,  133,  136,  138,
+  141,  144,  147,  149,  152,  155,  158,  161,  164,  167,  171,  174,  177,  180,  183,  187,
+  190,  194,  197,  200,  204,  208,  211,  215,  218,  222,  226,  230,  234,  237,  241,  245,
+  249,  254,  258,  262,  266,  270,  275,  279,  283,  288,  292,  297,  301,  306,  311,  315,
+  320,  325,  330,  335,  340,  345,  350,  355,  360,  365,  370,  376,  381,  386,  392,  397,
+  403,  408,  414,  420,  425,  431,  437,  443,  449,  455,  461,  467,  473,  480,  486,  492,
+  499,  505,  512,  518,  525,  532,  538,  545,  552,  559,  566,  573,  580,  587,  594,  601,
+  609,  616,  624,  631,  639,  646,  654,  662,  669,  677,  685,  693,  701,  709,  717,  726,
+  734,  742,  751,  759,  768,  776,  785,  794,  802,  811,  820,  829,  838,  847,  857,  866,
+  875,  885,  894,  903,  913,  923,  932,  942,  952,  962,  972,  982,  992, 1002, 1013, 1023,
+};
+
+long map(long x, long in_min, long in_max, long out_min, long out_max) {
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+/*
+ * set timer channel PW
+ */
+void t1pwm_setpw(uint8_t chl, uint16_t width)
+{
+	// The pulse apparently never ends if it is maximum length!
+	if (width == MAX_PWM_VAL) {
+		width = MAX_PWM_VAL-1;
+	}
+	switch(chl&3)
+	{
+		case 0: TIM1->CH1CVR = width; break;
+		case 1: TIM1->CH2CVR = width; break;
+		case 2: TIM1->CH3CVR = width; break;
+		case 3: TIM1->CH4CVR = width; break;
+	}
+}
+
+
+#define NUM_LEDS 3
+const int led_pins[NUM_LEDS] = {9, 5, 6};
+const int led_periods_ms[NUM_LEDS] = {500, 505, 510};
+uint8_t i = 0;
+const int dead_time_half = 500 / 8 / 2;
+
+void LEDBeats() {
+
+  for (i = 0; i < NUM_LEDS; i++) {
+		// Start them flashing at the same time
+    int timestamp = (millis() + 50) % led_periods_ms[i];
+    
+    int pwm_value = 0;
+    if (timestamp > led_periods_ms[i] / 2) {
+      // Make pattern symmetric at half of the period
+      timestamp = led_periods_ms[i] - timestamp;
+    }
+
+		if (timestamp < dead_time_half) {
+			pwm_value = 0;
+		} else {
+
+			pwm_value = map(timestamp, dead_time_half, led_periods_ms[i] / 2, 0, 255);
+			pwm_value = CIE[pwm_value];
+		}
+        
+    t1pwm_setpw(i, MAX_PWM_VAL-pwm_value);
+  }
+  
+}
 
 /*
  * initialize TIM1 for PWM
@@ -53,7 +131,7 @@ void t1pwm_init( void )
 	TIM1->PSC = 0x6;
 	
 	// Auto Reload - sets period
-	TIM1->ATRLR = MAX_PWM_VAL; //65535;//255;
+	TIM1->ATRLR = MAX_PWM_VAL;
 	
 	// Reload immediately
 	//TIM1->SWEVGR |= TIM_UG;
@@ -93,19 +171,6 @@ void t1pwm_init( void )
 	TIM1->CTLR1 |= TIM_CEN;
 }
 
-/*
- * set timer channel PW
- */
-void t1pwm_setpw(uint8_t chl, uint16_t width)
-{
-	switch(chl&3)
-	{
-		case 0: TIM1->CH1CVR = width; break;
-		case 1: TIM1->CH2CVR = width; break;
-		case 2: TIM1->CH3CVR = width; break;
-		case 3: TIM1->CH4CVR = width; break;
-	}
-}
 
 /*
 // Set up an interrupt handler for the update event (counter flips to 0)
@@ -130,16 +195,9 @@ void TIM1_UP_IRQHandler(void)
 
 
 
-// A bit hacky, but works for my purposes for now
-#include "patterns.c"
 
-//#include "stm32f0xx.h"
-/*
- * entry
- */
 int main()
 {
-	uint16_t pwm = 0;
 	
 	SystemInit();
 	Delay_Ms( 1000 );
@@ -160,15 +218,14 @@ int main()
 	//AFIO->PCFR1 |= GPIO_PartialRemap1_TIM1;
 	while(1) {
 		
-		
-		pwm = (pwm + 2) % MAX_PWM_VAL;
-		t1pwm_setpw(1, MAX_PWM_VAL-pwm); // Chl 1
-		TIM1->CTLR1 |= TIM_CEN;
+			
 
 		// Determine next values of LEDs. 
 		// Theoretically only MAX_PWM_VAL ticks of CPU available, but can 
 		// increase cpu freq if needed
-		//LEDBeats();
+		LEDBeats();
+
+		TIM1->CTLR1 |= TIM_CEN;
 		// Wait until TIM1 is done with pulse
 		// Optionally sleep CPU and have end of pulse automatically go to deep sleep?
 		while (TIM1->CTLR1 & TIM_CEN);
