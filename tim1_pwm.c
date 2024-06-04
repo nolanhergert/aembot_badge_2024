@@ -13,6 +13,7 @@
 
 #define millis()  (SysTick->CNT / DELAY_MS_TIME)
 
+// From https://gist.github.com/mathiasvr/19ce1d7b6caeab230934080ae1f1380e
 const uint16_t CIE[256] = {
     0,    0,    1,    1,    2,    2,    3,    3,    4,    4,    4,    5,    5,    6,    6,    7,
     7,    8,    8,    8,    9,    9,   10,   10,   11,   11,   12,   12,   13,   13,   14,   15,
@@ -43,7 +44,7 @@ void t1pwm_setpw(uint8_t chl, uint16_t width)
 {
 	// The pulse apparently never ends if it is maximum length!
 	if (width == MAX_PWM_VAL) {
-		width = MAX_PWM_VAL-1;
+		width = MAX_PWM_VAL;
 	}
 	switch(chl&3)
 	{
@@ -56,31 +57,30 @@ void t1pwm_setpw(uint8_t chl, uint16_t width)
 
 
 #define NUM_LEDS 3
-const int led_pins[NUM_LEDS] = {9, 5, 6};
-const int led_periods_ms[NUM_LEDS] = {500, 505, 510};
+const int ms_in_minute = 60000;
+const int led_periods_ms[NUM_LEDS] = {ms_in_minute/60, ms_in_minute/61, ms_in_minute/62};
 uint8_t i = 0;
-const int dead_time_half = 500 / 8 / 2;
+long millis_start = 0;
+void LEDBeatsSetup() {
+	millis_start = millis();
+}
 
 void LEDBeats() {
 
   for (i = 0; i < NUM_LEDS; i++) {
 		// Start them flashing at the same time
-    int timestamp = (millis() + 50) % led_periods_ms[i];
+    int timestamp = (millis() - millis_start) % led_periods_ms[i];
     
     int pwm_value = 0;
-    if (timestamp > led_periods_ms[i] / 2) {
-      // Make pattern symmetric at half of the period
-      timestamp = led_periods_ms[i] - timestamp;
-    }
 
-		if (timestamp < dead_time_half) {
-			pwm_value = 0;
+		if (timestamp < led_periods_ms[i]/4) {
+			pwm_value = map(timestamp, 0, led_periods_ms[i]/4, 255, 0);
 		} else {
-
-			pwm_value = map(timestamp, dead_time_half, led_periods_ms[i] / 2, 0, 255);
-			pwm_value = CIE[pwm_value];
+			pwm_value = 0;
 		}
-        
+
+		// Map "linear" to logarithmic value to match human vision
+    pwm_value = CIE[pwm_value];  
     t1pwm_setpw(i, MAX_PWM_VAL-pwm_value);
   }
   
@@ -128,10 +128,10 @@ void t1pwm_init( void )
 	// SMCFGR: default clk input is CK_INT
 	
 	// Prescaler 
-	TIM1->PSC = 0x6;
+	TIM1->PSC = 0x10;
 	
 	// Auto Reload - sets period
-	TIM1->ATRLR = MAX_PWM_VAL;
+	TIM1->ATRLR = MAX_PWM_VAL-1; // So off is actually off apparently
 	
 	// Reload immediately
 	//TIM1->SWEVGR |= TIM_UG;
@@ -216,6 +216,7 @@ int main()
 
 	printf("looping...\n\r");
 	//AFIO->PCFR1 |= GPIO_PartialRemap1_TIM1;
+	LEDBeatsSetup();
 	while(1) {
 		
 			
