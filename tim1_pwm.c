@@ -58,7 +58,7 @@ void t1pwm_setpw(uint8_t chl, uint16_t width)
 
 #define NUM_LEDS 3
 const int ms_in_minute = 60000;
-const int led_periods_ms[NUM_LEDS] = {ms_in_minute/60, ms_in_minute/61, ms_in_minute/62};
+const int led_periods_ms[NUM_LEDS] = {ms_in_minute/60, ms_in_minute/60.3, ms_in_minute/60.6};
 uint8_t i = 0;
 long millis_start = 0;
 void LEDBeatsSetup() {
@@ -128,7 +128,7 @@ void t1pwm_init( void )
 	// SMCFGR: default clk input is CK_INT
 	
 	// Prescaler 
-	TIM1->PSC = 0x10;
+	TIM1->PSC = 0x20;
 	
 	// Auto Reload - sets period
 	TIM1->ATRLR = MAX_PWM_VAL-1; // So off is actually off apparently
@@ -206,7 +206,7 @@ int main()
 	// RCC->CFGR0 |= RCC_HPRE_DIV32;
 
 
-	printf("\r\r\n\ntim1_pwm example\n\r");
+	printf("\r\r\n\nAEMBOT head!\n\r");
 
 	// init TIM1 for PWM
 	printf("initializing tim1...");
@@ -218,9 +218,6 @@ int main()
 	//AFIO->PCFR1 |= GPIO_PartialRemap1_TIM1;
 	LEDBeatsSetup();
 	while(1) {
-		
-			
-
 		// Determine next values of LEDs. 
 		// Theoretically only MAX_PWM_VAL ticks of CPU available, but can 
 		// increase cpu freq if needed
@@ -230,7 +227,6 @@ int main()
 		// Wait until TIM1 is done with pulse
 		// Optionally sleep CPU and have end of pulse automatically go to deep sleep?
 		while (TIM1->CTLR1 & TIM_CEN);
-		//Delay_Us( delay );
 
 		// TODO: Sleep!
 		// For now just do delay
