@@ -43,9 +43,6 @@ long map(long x, long in_min, long in_max, long out_min, long out_max) {
 void t1pwm_setpw(uint8_t chl, uint16_t width)
 {
 	// The pulse apparently never ends if it is maximum length!
-	if (width == MAX_PWM_VAL) {
-		width = MAX_PWM_VAL;
-	}
 	switch(chl&3)
 	{
 		case 0: TIM1->CH1CVR = width; break;
@@ -70,7 +67,7 @@ void LEDBeats() {
   for (i = 0; i < NUM_LEDS; i++) {
 		// Start them flashing at the same time
     int timestamp = (millis() - millis_start) % led_pulse_periods_ms[i];
-    
+
     int pwm_value = 0;
 
 		if (timestamp < led_pulse_periods_ms[i]/4) {
@@ -80,10 +77,10 @@ void LEDBeats() {
 		}
 
 		// Map "linear" to logarithmic value to match human vision
-    pwm_value = CIE[pwm_value];  
+    pwm_value = CIE[pwm_value];
     t1pwm_setpw(i, MAX_PWM_VAL-pwm_value);
   }
-  
+
 }
 
 
@@ -122,7 +119,7 @@ void enter_deep_sleep()
 
 }
 
-void leds_to_black() 
+void leds_to_black()
 {
 	for (int i = 0; i < NUM_LEDS; i++) {
 		t1pwm_setpw(i, 0);
@@ -138,50 +135,40 @@ void t1pwm_init( void )
 	// Enable GPIOC, GPIOD, GPIOA and TIM1
 	RCC->APB2PCENR |= 	RCC_APB2Periph_GPIOD | RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOA |
 						RCC_APB2Periph_TIM1;
-	
+
 	// PD2 is T1CH1, 10MHz Output alt func, push-pull
 	GPIOD->CFGLR &= ~(0xf<<(4*2));
-	GPIOD->CFGLR |= (GPIO_Speed_10MHz | GPIO_CNF_OUT_PP_AF)<<(4*2);
-	
+	GPIOD->CFGLR |= (GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF)<<(4*2);
+
 	// PA1 is T1CH2, 10MHz Output alt func, push-pull
 	GPIOA->CFGLR &= ~(0xf<<(4*1));
-	GPIOA->CFGLR |= (GPIO_Speed_10MHz | GPIO_CNF_OUT_PP_AF)<<(4*1);
+	GPIOA->CFGLR |= (GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF)<<(4*1);
 
 	// PC3 is T1CH3, 10MHz Output alt func, push-pull
 	GPIOC->CFGLR &= ~(0xf<<(4*3));
-	GPIOC->CFGLR |= (GPIO_Speed_10MHz | GPIO_CNF_OUT_PP_AF)<<(4*3);
+	GPIOC->CFGLR |= (GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF)<<(4*3);
 
 	// PC4 is T1CH4, 10MHz Output alt func, push-pull
 	GPIOC->CFGLR &= ~(0xf<<(4*4));
-	GPIOC->CFGLR |= (GPIO_Speed_10MHz | GPIO_CNF_OUT_PP_AF)<<(4*4);
+	GPIOC->CFGLR |= (GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF)<<(4*4);
 
 
-/*
-	// PC0 is T1CH3 alternate mapping, 10MHz Output alt func, push-pull
-	GPIOC->CFGLR &= ~(0xf<<(4*0));
-	GPIOC->CFGLR |= (GPIO_Speed_10MHz | GPIO_CNF_OUT_PP_AF)<<(4*0);
-	AFIO->PCFR1 |= GPIO_PartialRemap1_TIM1;
-*/
-
-		
 	// Reset TIM1 to init all regs
 	RCC->APB2PRSTR |= RCC_APB2Periph_TIM1;
 	RCC->APB2PRSTR &= ~RCC_APB2Periph_TIM1;
-	
+
 	// CTLR1: default is up, events generated, edge align
 	// SMCFGR: default clk input is CK_INT
-	
-	// Prescaler 
+
+	// Prescaler
 	TIM1->PSC = 0x20;
-	
+
 	// Auto Reload - sets period
 	TIM1->ATRLR = MAX_PWM_VAL-1; // So off is actually off apparently
-	
-	// Reload immediately
-	//TIM1->SWEVGR |= TIM_UG;
-	// One pulse mode, fire an interrupt when pulse finishes
-	TIM1->CTLR1 |= TIM_OPM | TIM_URS;
-	
+
+	// One pulse mode (pulse and then stop)
+	TIM1->CTLR1 |= TIM_OPM;
+
 	// Enable CH1 output, positive pol
 	TIM1->CCER |= TIM_CC1E | TIM_CC1P;
 
@@ -190,27 +177,27 @@ void t1pwm_init( void )
 
 	// Enable CH3 output, positive pol
 	TIM1->CCER |= TIM_CC3E | TIM_CC3P;
-	
+
 	// Enable CH4 output, positive pol
 	TIM1->CCER |= TIM_CC4E | TIM_CC4P;
-	
+
 	// CH1 Mode is output, PWM1 (CC1S = 00, OC1M = 110)
 	TIM1->CHCTLR1 |= TIM_OC1M_2 | TIM_OC1M_1;
 	TIM1->CHCTLR1 |= TIM_OC2M_2 | TIM_OC2M_1;
-	
+
 	// CH2 Mode is output, PWM1 (CC1S = 00, OC1M = 110)
 	TIM1->CHCTLR2 |= TIM_OC3M_2 | TIM_OC3M_1;
 	TIM1->CHCTLR2 |= TIM_OC4M_2 | TIM_OC4M_1;
-	
+
 	// Set the Capture Compare Register value to 0% initially
 	TIM1->CH1CVR = MAX_PWM_VAL;
 	TIM1->CH2CVR = MAX_PWM_VAL;
 	TIM1->CH3CVR = MAX_PWM_VAL;
 	TIM1->CH4CVR = MAX_PWM_VAL;
-	
+
 	// Enable TIM1 outputs
 	TIM1->BDTR |= TIM_MOE;
-	
+
 	// Enable TIM1
 	TIM1->CTLR1 |= TIM_CEN;
 }
@@ -219,7 +206,7 @@ void t1pwm_init( void )
 
 int main()
 {
-	
+
 	SystemInit();
 	Delay_Ms( 1000 );
 
@@ -227,17 +214,17 @@ int main()
 	printf("initializing tim1...");
 	t1pwm_init();
 	printf("done.\n\r");
-		
+
 
 	printf("looping...\n\r");
 	LEDBeatsSetup();
-#ifdef DEEP_SLEEP		
+#ifdef DEEP_SLEEP
 	setup_deep_sleep();
 #endif
 	while(1) {
-		
-		// Determine next values of LEDs. 
-		// Theoretically only MAX_PWM_VAL ticks of CPU available, but can 
+
+		// Determine next values of LEDs.
+		// Theoretically only MAX_PWM_VAL ticks of CPU available, but can
 		// increase cpu freq if needed
 		LEDBeats();
 		//printf("looping...\n\r");
@@ -247,15 +234,15 @@ int main()
 		// Optionally sleep CPU and have end of pulse automatically go to deep sleep?
 		while (TIM1->CTLR1 & TIM_CEN);
 
-#ifdef DEEP_SLEEP		
+#ifdef DEEP_SLEEP
 		enter_deep_sleep();
 		__WFE();
 		// Restore clocks, etc
 		SystemInit();
 #else
 		Delay_Us( 12500 );
-#endif		
-	}	
+#endif
+	}
 }
 
 // TODO before ship:
@@ -270,3 +257,5 @@ int main()
 //  * Determine if more CPU time is needed and increase CPU freq and MAX_PWM_VAL to compensate. Still want ~.4 seconds of light in the end though.
 //  * Do computation of values in a function call so you can save them off for next boot. Meanwhile do one pulse of LED
 //  * Decide tabs/spaces
+//  * Bootloader should blink too, or just start program at high freq?
+//  * Make CIE table 1024 wide too?
