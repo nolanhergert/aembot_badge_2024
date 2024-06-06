@@ -58,7 +58,7 @@ void t1pwm_setpw(uint8_t chl, uint16_t width)
 
 #define NUM_LEDS 3
 const int ms_in_minute = 60000;
-const int led_periods_ms[NUM_LEDS] = {ms_in_minute/60, ms_in_minute/60.3, ms_in_minute/60.6};
+const int led_pulse_periods_ms[NUM_LEDS] = {ms_in_minute/60, ms_in_minute/60.3, ms_in_minute/60.6};
 uint8_t i = 0;
 long millis_start = 0;
 void LEDBeatsSetup() {
@@ -69,12 +69,12 @@ void LEDBeats() {
 
   for (i = 0; i < NUM_LEDS; i++) {
 		// Start them flashing at the same time
-    int timestamp = (millis() - millis_start) % led_periods_ms[i];
+    int timestamp = (millis() - millis_start) % led_pulse_periods_ms[i];
     
     int pwm_value = 0;
 
-		if (timestamp < led_periods_ms[i]/4) {
-			pwm_value = map(timestamp, 0, led_periods_ms[i]/4, 255, 0);
+		if (timestamp < led_pulse_periods_ms[i]/4) {
+			pwm_value = map(timestamp, 0, led_pulse_periods_ms[i]/4, 255, 0);
 		} else {
 			pwm_value = 0;
 		}
@@ -85,6 +85,50 @@ void LEDBeats() {
   }
   
 }
+
+
+void setup_deep_sleep()
+{
+
+	// enable power interface module clock
+	RCC->APB1PCENR |= RCC_APB1Periph_PWR;
+
+	// enable low speed oscillator (LSI)
+	RCC->RSTSCKR |= RCC_LSION;
+	while ((RCC->RSTSCKR & RCC_LSIRDY) == 0) {}
+
+	// enable AutoWakeUp event
+	EXTI->EVENR |= EXTI_Line9;
+	EXTI->FTENR |= EXTI_Line9;
+
+	// configure AWU prescaler
+	PWR->AWUPSC |= PWR_AWU_Prescaler_1024;
+
+	// configure AWU window comparison value
+	PWR->AWUWR &= ~0x3f;
+	PWR->AWUWR |= 1;
+
+	// enable AWU
+	PWR->AWUCSR |= (1 << 1);
+
+	// select standby on power-down
+	PWR->CTLR |= PWR_CTLR_PDDS;
+}
+
+void enter_deep_sleep()
+{
+	// peripheral interrupt controller send to deep sleep
+	PFIC->SCTLR |= (1 << 2);
+
+}
+
+void leds_to_black() 
+{
+	for (int i = 0; i < NUM_LEDS; i++) {
+		t1pwm_setpw(i, 0);
+	}
+}
+
 
 /*
  * initialize TIM1 for PWM
@@ -171,42 +215,13 @@ void t1pwm_init( void )
 	TIM1->CTLR1 |= TIM_CEN;
 }
 
-
-/*
-// Set up an interrupt handler for the update event (counter flips to 0)
-
-void TIM1_UP_IRQHandler(void) __attribute__((interrupt));
-void TIM1_UP_IRQHandler(void)
-{
-	// move the compare further ahead in time.
-	// as a warning, if more than this length of time
-	// passes before triggering, you may miss your
-	// interrupt.
-	SysTick->CMP += (FUNCONF_SYSTEM_CORE_CLOCK/1000);
-
-	// clear IRQ
-	SysTick->SR = 0;
-
-	// update counter
-	systick_cnt++;
-}
-
-*/
-
-
-
+//#define DEEP_SLEEP
 
 int main()
 {
 	
 	SystemInit();
 	Delay_Ms( 1000 );
-
-	//RCC->CFGR0 &= RCC_HPRE;
-	// RCC->CFGR0 |= RCC_HPRE_DIV32;
-
-
-	printf("\r\r\n\nAEMBOT head!\n\r");
 
 	// init TIM1 for PWM
 	printf("initializing tim1...");
@@ -215,27 +230,43 @@ int main()
 		
 
 	printf("looping...\n\r");
-	//AFIO->PCFR1 |= GPIO_PartialRemap1_TIM1;
 	LEDBeatsSetup();
+#ifdef DEEP_SLEEP		
+	setup_deep_sleep();
+#endif
 	while(1) {
+		
 		// Determine next values of LEDs. 
 		// Theoretically only MAX_PWM_VAL ticks of CPU available, but can 
 		// increase cpu freq if needed
 		LEDBeats();
+		//printf("looping...\n\r");
 
 		TIM1->CTLR1 |= TIM_CEN;
 		// Wait until TIM1 is done with pulse
 		// Optionally sleep CPU and have end of pulse automatically go to deep sleep?
 		while (TIM1->CTLR1 & TIM_CEN);
 
-		// TODO: Sleep!
-		// For now just do delay
-		t1pwm_setpw(1, MAX_PWM_VAL); // Chl 1
-		Delay_Us( 13333 );
+#ifdef DEEP_SLEEP		
+		enter_deep_sleep();
+		__WFE();
+		// Restore clocks, etc
+		SystemInit();
+#else
+		Delay_Us( 12500 );
+#endif		
 	}	
 }
 
 // TODO before ship:
-//  * Set prescalar for TIM1 to 0 and adjust system clock. Need to make sure millis() still works. Propose millis()?
+//  * Set prescalar for TIM1 to 0 and adjust system clock to lower current draw. Need to make sure millis() still works. Propose millis() to charles?
+
+  // TODO: Lower main cpu clock frequency
+	//RCC->CFGR0 &= RCC_HPRE;
+	//RCC->CFGR0 |= RCC_HPRE_DIV32;
+
+
 //  * Clean up unused code for clarity
 //  * Determine if more CPU time is needed and increase CPU freq and MAX_PWM_VAL to compensate. Still want ~.4 seconds of light in the end though.
+//  * Do computation of values in a function call so you can save them off for next boot. Meanwhile do one pulse of LED
+//  * Decide tabs/spaces
