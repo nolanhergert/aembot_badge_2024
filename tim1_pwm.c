@@ -42,20 +42,18 @@ long map(long x, long in_min, long in_max, long out_min, long out_max) {
  */
 void t1pwm_setpw(uint8_t chl, uint16_t width)
 {
-	// The pulse apparently never ends if it is maximum length!
 	switch(chl&3)
 	{
 		case 0: TIM1->CH1CVR = width; break;
-		case 1: TIM1->CH2CVR = width; break;
-		case 2: TIM1->CH3CVR = width; break;
-		case 3: TIM1->CH4CVR = width; break;
+		case 1: TIM1->CH3CVR = width; break;
+		case 2: TIM1->CH4CVR = width; break;
 	}
 }
 
 
 #define NUM_LEDS 3
 const int ms_in_minute = 60000;
-const int led_pulse_periods_ms[NUM_LEDS] = {ms_in_minute/60, ms_in_minute/60.3, ms_in_minute/60.6};
+const int led_pulse_periods_ms[NUM_LEDS] = {ms_in_minute/60.6, ms_in_minute/60.3, ms_in_minute/60};
 uint8_t i = 0;
 long millis_start = 0;
 void LEDBeatsSetup() {
@@ -181,13 +179,13 @@ void t1pwm_init( void )
 	// Enable CH4 output, positive pol
 	TIM1->CCER |= TIM_CC4E | TIM_CC4P;
 
-	// CH1 Mode is output, PWM1 (CC1S = 00, OC1M = 110)
-	TIM1->CHCTLR1 |= TIM_OC1M_2 | TIM_OC1M_1;
-	TIM1->CHCTLR1 |= TIM_OC2M_2 | TIM_OC2M_1;
+	// CH1 Mode is output, PWM1 (CC1S = 00, OC1M = 011)
+	TIM1->CHCTLR1 |= TIM_OC1M_0 | TIM_OC1M_1;
+	TIM1->CHCTLR1 |= TIM_OC2M_0 | TIM_OC2M_1;
 
-	// CH2 Mode is output, PWM1 (CC1S = 00, OC1M = 110)
-	TIM1->CHCTLR2 |= TIM_OC3M_2 | TIM_OC3M_1;
-	TIM1->CHCTLR2 |= TIM_OC4M_2 | TIM_OC4M_1;
+	// CH2 Mode is output, PWM1 (CC1S = 00, OC1M = 011)
+	TIM1->CHCTLR2 |= TIM_OC3M_0 | TIM_OC3M_1;
+	TIM1->CHCTLR2 |= TIM_OC4M_0 | TIM_OC4M_1;
 
 	// Set the Capture Compare Register value to 0% initially
 	TIM1->CH1CVR = MAX_PWM_VAL;
@@ -259,3 +257,4 @@ int main()
 //  * Decide tabs/spaces
 //  * Bootloader should blink too, or just start program at high freq?
 //  * Make CIE table 1024 wide too?
+//  * Make light values make sense. 0 = dark, MAX_PWM_VAL = max brightness
