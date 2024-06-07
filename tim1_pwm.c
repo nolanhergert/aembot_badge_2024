@@ -258,3 +258,6 @@ int main()
 //  * Bootloader should blink too, or just start program at high freq?
 //  * Make CIE table 1024 wide too?
 //  * Make light values make sense. 0 = dark, MAX_PWM_VAL = max brightness
+
+// Nice to have
+//  * Save settings...https://github.com/cnlohr/ch32v003fun/pull/85 and https://github.com/recallmenot/ch32v003fun_wildwest/blob/main/lib%2Fch32v003_flash.h
