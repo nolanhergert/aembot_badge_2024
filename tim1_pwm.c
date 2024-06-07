@@ -7,11 +7,14 @@
 #include <stdio.h>
 
 
+#define DEEP_SLEEP
+#define DEEP_SLEEP_TIME_MS 13
 
 #define MAX_PWM_VAL 1024
 
-
-#define millis()  (SysTick->CNT / DELAY_MS_TIME)
+long millis_start = 0;
+long deep_sleep_time_ms = 0;
+#define millis()  (SysTick->CNT / DELAY_MS_TIME - millis_start + deep_sleep_time_ms)
 
 // From https://gist.github.com/mathiasvr/19ce1d7b6caeab230934080ae1f1380e
 const uint16_t CIE[256] = {
@@ -55,16 +58,12 @@ void t1pwm_setpw(uint8_t chl, uint16_t width)
 const int ms_in_minute = 60000;
 const int led_pulse_periods_ms[NUM_LEDS] = {ms_in_minute/60.6, ms_in_minute/60.3, ms_in_minute/60};
 uint8_t i = 0;
-long millis_start = 0;
-void LEDBeatsSetup() {
-	millis_start = millis();
-}
 
 void LEDBeats() {
 
   for (i = 0; i < NUM_LEDS; i++) {
 		// Start them flashing at the same time
-    int timestamp = (millis() - millis_start) % led_pulse_periods_ms[i];
+    int timestamp = (millis()) % led_pulse_periods_ms[i];
 
     int pwm_value = 0;
 
@@ -200,7 +199,6 @@ void t1pwm_init( void )
 	TIM1->CTLR1 |= TIM_CEN;
 }
 
-//#define DEEP_SLEEP
 
 int main()
 {
@@ -215,7 +213,7 @@ int main()
 
 
 	printf("looping...\n\r");
-	LEDBeatsSetup();
+	millis_start = millis();
 #ifdef DEEP_SLEEP
 	setup_deep_sleep();
 #endif
@@ -237,6 +235,8 @@ int main()
 		__WFE();
 		// Restore clocks, etc
 		SystemInit();
+		//
+		deep_sleep_time_ms += DEEP_SLEEP_TIME_MS;
 #else
 		Delay_Us( 12500 );
 #endif
@@ -253,6 +253,7 @@ int main()
 
 //  * Clean up unused code for clarity
 //  * Determine if more CPU time is needed and increase CPU freq and MAX_PWM_VAL to compensate. Still want ~.4 seconds of light in the end though.
+//  * Make millis() use the low speed timer? Maybe that doesn't continue running in the background? Not sure.
 //  * Do computation of values in a function call so you can save them off for next boot. Meanwhile do one pulse of LED
 //  * Decide tabs/spaces
 //  * Bootloader should blink too, or just start program at high freq?
