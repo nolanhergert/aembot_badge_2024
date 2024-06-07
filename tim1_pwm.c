@@ -8,13 +8,13 @@
 
 
 #define DEEP_SLEEP
-#define DEEP_SLEEP_TIME_MS 13
+#define DEEP_SLEEP_TIME_US 16800
 
 #define MAX_PWM_VAL 1024
 
-long millis_start = 0;
-long deep_sleep_time_ms = 0;
-#define millis()  (SysTick->CNT / DELAY_MS_TIME - millis_start + deep_sleep_time_ms)
+long micros_start = 0;
+long deep_sleep_time_us = 0;
+#define micros()  (SysTick->CNT / DELAY_US_TIME - micros_start + deep_sleep_time_us)
 
 // From https://gist.github.com/mathiasvr/19ce1d7b6caeab230934080ae1f1380e
 const uint16_t CIE[256] = {
@@ -55,20 +55,20 @@ void t1pwm_setpw(uint8_t chl, uint16_t width)
 
 
 #define NUM_LEDS 3
-const int ms_in_minute = 60000;
-const int led_pulse_periods_ms[NUM_LEDS] = {ms_in_minute/60.6, ms_in_minute/60.3, ms_in_minute/60};
+const long us_in_minute = 60000*1000;
+const long led_pulse_periods_us[NUM_LEDS] = {us_in_minute/50.6, us_in_minute/50.3, us_in_minute/50};
 uint8_t i = 0;
 
 void LEDBeats() {
 
   for (i = 0; i < NUM_LEDS; i++) {
 		// Start them flashing at the same time
-    int timestamp = (millis()) % led_pulse_periods_ms[i];
+    int timestamp = (micros()) % led_pulse_periods_us[i];
 
     int pwm_value = 0;
 
-		if (timestamp < led_pulse_periods_ms[i]/4) {
-			pwm_value = map(timestamp, 0, led_pulse_periods_ms[i]/4, 255, 0);
+		if (timestamp < led_pulse_periods_us[i]/4) {
+			pwm_value = map(timestamp, 0, led_pulse_periods_us[i]/4, 255, 0);
 		} else {
 			pwm_value = 0;
 		}
@@ -213,7 +213,7 @@ int main()
 
 
 	printf("looping...\n\r");
-	millis_start = millis();
+	micros_start = micros();
 #ifdef DEEP_SLEEP
 	setup_deep_sleep();
 #endif
@@ -236,7 +236,7 @@ int main()
 		// Restore clocks, etc
 		SystemInit();
 		//
-		deep_sleep_time_ms += DEEP_SLEEP_TIME_MS;
+		deep_sleep_time_us += DEEP_SLEEP_TIME_US;
 #else
 		Delay_Us( 12500 );
 #endif
@@ -244,7 +244,7 @@ int main()
 }
 
 // TODO before ship:
-//  * Set prescalar for TIM1 to 0 and adjust system clock to lower current draw. Need to make sure millis() still works. Propose millis() to charles?
+//  * Set prescalar for TIM1 to 0 and adjust system clock to lower current draw. Need to make sure micros() still works. Propose micros() to charles?
 
   // TODO: Lower main cpu clock frequency
 	//RCC->CFGR0 &= RCC_HPRE;
@@ -253,7 +253,6 @@ int main()
 
 //  * Clean up unused code for clarity
 //  * Determine if more CPU time is needed and increase CPU freq and MAX_PWM_VAL to compensate. Still want ~.4 seconds of light in the end though.
-//  * Make millis() use the low speed timer? Maybe that doesn't continue running in the background? Not sure.
 //  * Do computation of values in a function call so you can save them off for next boot. Meanwhile do one pulse of LED
 //  * Decide tabs/spaces
 //  * Bootloader should blink too, or just start program at high freq?
