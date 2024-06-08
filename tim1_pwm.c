@@ -136,12 +136,25 @@ void Breathe() {
 
 	printf("pWM: %d\n\r", pwm_value);
 
+
+
+	// TODO: Restore back for all leds
+  //for (i = 0; i < NUM_LEDS; i++) {
+
+
+
+
+
   for (i = 0; i < 1; i++) {
 		printf("dur ");
 		// Map "linear" to logarithmic value to match human vision
     pwm_value = CIE[pwm_value];
     t1pwm_setpw(i, MAX_PWM_VAL-pwm_value);
   }
+
+
+
+
 
 }
 
