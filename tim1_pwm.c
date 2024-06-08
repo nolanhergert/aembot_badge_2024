@@ -61,7 +61,8 @@ long map(long x, long in_min, long in_max, long out_min, long out_max) {
  */
 void t1pwm_setpw(uint8_t chl, uint16_t width)
 {
-	//width = MAX_PWM_VAL - width;
+	// Make values make sense. 0 = dark, MAX_PWM_VAL = bright
+	width = MAX_PWM_VAL - width;
 	switch(chl&3)
 	{
 		case 0: TIM1->CH1CVR = width; break;
@@ -91,7 +92,7 @@ void LEDBeats() {
 
 		// Map "linear" to logarithmic value to match human vision
     pwm_value = CIE[pwm_value];
-		next_pwm_vals[i] = MAX_PWM_VAL - pwm_value;
+		next_pwm_vals[i] = pwm_value;
   }
 }
 
@@ -144,7 +145,7 @@ void Breathe() {
 	pwm_value = CIE[pwm_value];
 
   for (i = 0; i < NUM_LEDS; i++) {
-		next_pwm_vals[i] = MAX_PWM_VAL - pwm_value;
+		next_pwm_vals[i] = pwm_value;
   }
 }
 
@@ -348,18 +349,11 @@ int main()
 // TODO before ship:
 //  * Set prescalar for TIM1 to 0 and adjust system clock to lower current draw. Need to make sure millis() still works. Propose millis() to charles?
 
-  // TODO: Lower main cpu clock frequency
-	//RCC->CFGR0 &= RCC_HPRE;
-	//RCC->CFGR0 |= RCC_HPRE_DIV32;
-
-
 //  * Clean up unused code for clarity
-//  * Determine if more CPU time is needed and increase CPU freq and MAX_PWM_VAL to compensate. Still want ~.4 seconds of light in the end though.
 //  * Do computation of values in a function call so you can save them off for next boot. Meanwhile do one pulse of LED
 //  * Decide tabs/spaces
 //  * Bootloader should blink too, or just start program at high freq?
 //  * Make CIE table 1024 wide too?
-//  * Make light values make sense. 0 = dark, MAX_PWM_VAL = max brightness
 //  * Double check current draw during deep sleep. Turn off gpios?
 
 // Nice to have
