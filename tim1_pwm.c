@@ -5,23 +5,29 @@
 
 #include "ch32v003fun.h"
 #include <stdio.h>
+#include "ch32v003_GPIO_branchless.h"
 
 // Are we going to use deep sleep? If yes, leave uncommented
 #define DEEP_SLEEP
 
-#define DEEP_SLEEP_TIME_US 16800
+#define DEEP_SLEEP_TIME_MS 17 // (really 16.8)
 
 #define MAX_PWM_VAL 1024
 
 #define NUM_LEDS 3
 uint8_t i = 0;
 
-long micros_start = 0;
-long deep_sleep_time_us = 0;
-// Time in microseconds since the board was turned on
+uint8_t button_is_pressed = 0;
+long button_started_press_ms = 0;
+long button_released_press_ms = 0;
+#define BUTTON_DEBOUNCE_DELAY_MS 20
+
+long millis_start = 0;
+long deep_sleep_time_ms = 0;
+// Time in milliseconds since the board was turned on
 // Compensates for startup delay and deep sleep section, where the main HSI clock
 // is not ticking!
-#define micros()  (SysTick->CNT / DELAY_US_TIME - micros_start + deep_sleep_time_us)
+#define millis()  (SysTick->CNT / DELAY_MS_TIME - millis_start + deep_sleep_time_ms)
 
 // From https://gist.github.com/mathiasvr/19ce1d7b6caeab230934080ae1f1380e
 const uint16_t CIE[256] = {
@@ -61,19 +67,19 @@ void t1pwm_setpw(uint8_t chl, uint16_t width)
 }
 
 
-const long us_in_minute = 60000*1000;
-const long led_pulse_periods_us[NUM_LEDS] = {us_in_minute/50.6, us_in_minute/50.3, us_in_minute/50};
+const long ms_in_minute = 60000;
+const long led_pulse_periods_ms[NUM_LEDS] = {ms_in_minute/50.4, ms_in_minute/50.2, ms_in_minute/50};
 
 void LEDBeats() {
 
   for (i = 0; i < NUM_LEDS; i++) {
 		// Start them flashing at the same time
-    int timestamp = (micros()) % led_pulse_periods_us[i];
+    int timestamp = (millis()) % led_pulse_periods_ms[i];
 
     int pwm_value = 0;
 
-		if (timestamp < led_pulse_periods_us[i]/4) {
-			pwm_value = map(timestamp, 0, led_pulse_periods_us[i]/4, 255, 0);
+		if (timestamp < led_pulse_periods_ms[i]/4) {
+			pwm_value = map(timestamp, 0, led_pulse_periods_ms[i]/4, 255, 0);
 		} else {
 			pwm_value = 0;
 		}
@@ -84,7 +90,8 @@ void LEDBeats() {
   }
 }
 
-/* White Noise Generator State */
+/*
+// White Noise Generator State
 #define NOISE_BITS 8
 #define NOISE_MASK ((1<<NOISE_BITS)-1)
 #define NOISE_POLY_TAP0 31
@@ -93,9 +100,7 @@ void LEDBeats() {
 #define NOISE_POLY_TAP3 0
 uint32_t lfsr = 1;
 
-/*
- * random byte generator
- */
+// random byte generator
 uint8_t rand8(void)
 {
 	uint8_t bit;
@@ -112,15 +117,11 @@ uint8_t rand8(void)
 
 	return lfsr&NOISE_MASK;
 }
+*/
 
-const long breath_period_avg_ms = 10*1000;
-const long breath_period_variance_ms = 1*1000;
-long  breath_period_ms = breath_period_avg_ms;
-
+const long breath_period_ms = 10*1000;
 void Breathe() {
-  printf("\r\nbefore\n\r");
-	long timestamp = (micros() / 1000) % breath_period_ms;
-	printf("ts: %d\n\r", timestamp);
+	long timestamp = (millis()) % breath_period_ms;
 
 	int pwm_value = 0;
 
@@ -134,30 +135,13 @@ void Breathe() {
 		pwm_value = 0;
 	}
 
-	printf("pWM: %d\n\r", pwm_value);
+	pwm_value = CIE[pwm_value];
 
-
-
-	// TODO: Restore back for all leds
-  //for (i = 0; i < NUM_LEDS; i++) {
-
-
-
-
-
-  for (i = 0; i < 1; i++) {
-		printf("dur ");
+  for (i = 0; i < NUM_LEDS; i++) {
 		// Map "linear" to logarithmic value to match human vision
-    pwm_value = CIE[pwm_value];
     t1pwm_setpw(i, MAX_PWM_VAL-pwm_value);
   }
-
-
-
-
-
 }
-
 
 void setup_deep_sleep()
 {
@@ -197,25 +181,27 @@ void enter_deep_sleep()
 /*
  * initialize TIM1 for PWM
  */
-void t1pwm_init( void )
+void aemhead_init( void )
 {
-	// Enable GPIOC, GPIOD, GPIOA and TIM1
-	RCC->APB2PCENR |= 	RCC_APB2Periph_GPIOD | RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOA |
+	// Enable GPIOC, GPIOD and TIM1
+	RCC->APB2PCENR |= 	RCC_APB2Periph_GPIOD | RCC_APB2Periph_GPIOC |
 						RCC_APB2Periph_TIM1;
 
-	// PD2 is T1CH1, 10MHz Output alt func, push-pull
+	// PD0 is BUTTON_STYLE, Input with pull-up/pull-down resistors
+	GPIOD->CFGLR &= ~(0xf<<(4*0));
+	GPIOD->CFGLR |= (GPIO_Speed_In | GPIO_CNF_IN_PUPD)<<(4*0);
+	// Set up the pin as pull down
+	GPIO_digitalWrite_lo(GPIOv_from_PORT_PIN(GPIO_port_D, 0));
+
+	// PD2 is T1CH1, 2MHz Output alt func, push-pull
 	GPIOD->CFGLR &= ~(0xf<<(4*2));
 	GPIOD->CFGLR |= (GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF)<<(4*2);
 
-	// PA1 is T1CH2, 10MHz Output alt func, push-pull
-	GPIOA->CFGLR &= ~(0xf<<(4*1));
-	GPIOA->CFGLR |= (GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF)<<(4*1);
-
-	// PC3 is T1CH3, 10MHz Output alt func, push-pull
+	// PC3 is T1CH3, 2MHz Output alt func, push-pull
 	GPIOC->CFGLR &= ~(0xf<<(4*3));
 	GPIOC->CFGLR |= (GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF)<<(4*3);
 
-	// PC4 is T1CH4, 10MHz Output alt func, push-pull
+	// PC4 is T1CH4, 2MHz Output alt func, push-pull
 	GPIOC->CFGLR &= ~(0xf<<(4*4));
 	GPIOC->CFGLR |= (GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF)<<(4*4);
 
@@ -223,9 +209,6 @@ void t1pwm_init( void )
 	// Reset TIM1 to init all regs
 	RCC->APB2PRSTR |= RCC_APB2Periph_TIM1;
 	RCC->APB2PRSTR &= ~RCC_APB2Periph_TIM1;
-
-	// CTLR1: default is up, events generated, edge align
-	// SMCFGR: default clk input is CK_INT
 
 	// Prescaler
 	TIM1->PSC = 0x20;
@@ -269,6 +252,19 @@ void t1pwm_init( void )
 	TIM1->CTLR1 |= TIM_CEN;
 }
 
+typedef void (*style)(void);
+style styles[] = {&LEDBeats, &Breathe};
+uint8_t style_index = 0;
+
+void increment_style_index() {
+	style_index = (style_index + 1) % (sizeof(styles) / sizeof(styles[0]));
+}
+
+// Intent is to have millis() == 0 after this function runs
+void reset_millis_offset() {
+	millis_start = SysTick->CNT / DELAY_MS_TIME;
+	deep_sleep_time_ms = 0;
+}
 
 int main()
 {
@@ -278,19 +274,38 @@ int main()
 
 	// init TIM1 for PWM
 	printf("initializing tim1...");
-	t1pwm_init();
+	aemhead_init();
 
-	micros_start = micros();
+  reset_millis_offset();
 #ifdef DEEP_SLEEP
 	setup_deep_sleep();
 #endif
 	while(1) {
+		// Check style button state
+		// If user pressed the button, they must release it before pressing again
+		// (time held doesn't matter)
+		if (button_is_pressed == 0 &&
+		 		GPIO_digitalRead(GPIOv_from_PORT_PIN(GPIO_port_D, 0)) == high &&
+				millis() > (button_released_press_ms + BUTTON_DEBOUNCE_DELAY_MS))
+		{
+			button_is_pressed = 1;
+			increment_style_index();
+			// Start patterns at the beginning
+			reset_millis_offset();
+			button_started_press_ms = millis();
+		}
+		if (button_is_pressed == 1 &&
+				GPIO_digitalRead(GPIOv_from_PORT_PIN(GPIO_port_D, 0)) == low &&
+				millis() > (button_started_press_ms + BUTTON_DEBOUNCE_DELAY_MS))
+		{
+			button_is_pressed = 0;
+			button_released_press_ms = millis();
+		}
 
 		// Determine next values of LEDs.
 		// Theoretically only MAX_PWM_VAL ticks of CPU available, but can
 		// increase cpu freq if needed
-		//LEDBeats();
-		Breathe();
+		styles[style_index]();
 
 		TIM1->CTLR1 |= TIM_CEN;
 		// Wait until TIM1 is done with pulse
@@ -303,15 +318,15 @@ int main()
 		// Restore clocks, etc
 		SystemInit();
 		//
-		deep_sleep_time_us += DEEP_SLEEP_TIME_US;
+		deep_sleep_time_ms += DEEP_SLEEP_TIME_MS;
 #else
-		Delay_Us( 12500 );
+		Delay_Ms( 12500 );
 #endif
 	}
 }
 
 // TODO before ship:
-//  * Set prescalar for TIM1 to 0 and adjust system clock to lower current draw. Need to make sure micros() still works. Propose micros() to charles?
+//  * Set prescalar for TIM1 to 0 and adjust system clock to lower current draw. Need to make sure millis() still works. Propose millis() to charles?
 
   // TODO: Lower main cpu clock frequency
 	//RCC->CFGR0 &= RCC_HPRE;
@@ -325,6 +340,7 @@ int main()
 //  * Bootloader should blink too, or just start program at high freq?
 //  * Make CIE table 1024 wide too?
 //  * Make light values make sense. 0 = dark, MAX_PWM_VAL = max brightness
+//  * Double check current draw during deep sleep. Turn off gpios?
 
 // Nice to have
 //  * Save settings...https://github.com/cnlohr/ch32v003fun/pull/85 and https://github.com/recallmenot/ch32v003fun_wildwest/blob/main/lib%2Fch32v003_flash.h
