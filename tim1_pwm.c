@@ -6,14 +6,21 @@
 #include "ch32v003fun.h"
 #include <stdio.h>
 
-
+// Are we going to use deep sleep? If yes, leave uncommented
 #define DEEP_SLEEP
+
 #define DEEP_SLEEP_TIME_US 16800
 
 #define MAX_PWM_VAL 1024
 
+#define NUM_LEDS 3
+uint8_t i = 0;
+
 long micros_start = 0;
 long deep_sleep_time_us = 0;
+// Time in microseconds since the board was turned on
+// Compensates for startup delay and deep sleep section, where the main HSI clock
+// is not ticking!
 #define micros()  (SysTick->CNT / DELAY_US_TIME - micros_start + deep_sleep_time_us)
 
 // From https://gist.github.com/mathiasvr/19ce1d7b6caeab230934080ae1f1380e
@@ -54,10 +61,8 @@ void t1pwm_setpw(uint8_t chl, uint16_t width)
 }
 
 
-#define NUM_LEDS 3
 const long us_in_minute = 60000*1000;
 const long led_pulse_periods_us[NUM_LEDS] = {us_in_minute/50.6, us_in_minute/50.3, us_in_minute/50};
-uint8_t i = 0;
 
 void LEDBeats() {
 
@@ -73,6 +78,66 @@ void LEDBeats() {
 			pwm_value = 0;
 		}
 
+		// Map "linear" to logarithmic value to match human vision
+    pwm_value = CIE[pwm_value];
+    t1pwm_setpw(i, MAX_PWM_VAL-pwm_value);
+  }
+}
+
+/* White Noise Generator State */
+#define NOISE_BITS 8
+#define NOISE_MASK ((1<<NOISE_BITS)-1)
+#define NOISE_POLY_TAP0 31
+#define NOISE_POLY_TAP1 21
+#define NOISE_POLY_TAP2 1
+#define NOISE_POLY_TAP3 0
+uint32_t lfsr = 1;
+
+/*
+ * random byte generator
+ */
+uint8_t rand8(void)
+{
+	uint8_t bit;
+	uint32_t new_data;
+
+	for(bit=0;bit<NOISE_BITS;bit++)
+	{
+		new_data = ((lfsr>>NOISE_POLY_TAP0) ^
+					(lfsr>>NOISE_POLY_TAP1) ^
+					(lfsr>>NOISE_POLY_TAP2) ^
+					(lfsr>>NOISE_POLY_TAP3));
+		lfsr = (lfsr<<1) | (new_data&1);
+	}
+
+	return lfsr&NOISE_MASK;
+}
+
+const long breath_period_avg_ms = 10*1000;
+const long breath_period_variance_ms = 1*1000;
+long  breath_period_ms = breath_period_avg_ms;
+
+void Breathe() {
+  printf("\r\nbefore\n\r");
+	long timestamp = (micros() / 1000) % breath_period_ms;
+	printf("ts: %d\n\r", timestamp);
+
+	int pwm_value = 0;
+
+	if (timestamp < breath_period_ms/3) {
+		// Breathe in
+		pwm_value = map(timestamp, 0, breath_period_ms/3, 0, 255);
+	} else if (timestamp < (2*breath_period_ms)/3) {
+		// Breathe out
+		pwm_value = map(timestamp, breath_period_ms/3, (2*breath_period_ms)/3, 255, 0);
+	} else {
+		pwm_value = 0;
+	}
+
+	printf("pWM: %d\n\r", pwm_value);
+
+  for (i = 0; i < 1; i++) {
+		printf("dur ");
 		// Map "linear" to logarithmic value to match human vision
     pwm_value = CIE[pwm_value];
     t1pwm_setpw(i, MAX_PWM_VAL-pwm_value);
@@ -115,14 +180,6 @@ void enter_deep_sleep()
 	PFIC->SCTLR |= (1 << 2);
 
 }
-
-void leds_to_black()
-{
-	for (int i = 0; i < NUM_LEDS; i++) {
-		t1pwm_setpw(i, 0);
-	}
-}
-
 
 /*
  * initialize TIM1 for PWM
@@ -209,10 +266,7 @@ int main()
 	// init TIM1 for PWM
 	printf("initializing tim1...");
 	t1pwm_init();
-	printf("done.\n\r");
 
-
-	printf("looping...\n\r");
 	micros_start = micros();
 #ifdef DEEP_SLEEP
 	setup_deep_sleep();
@@ -222,8 +276,8 @@ int main()
 		// Determine next values of LEDs.
 		// Theoretically only MAX_PWM_VAL ticks of CPU available, but can
 		// increase cpu freq if needed
-		LEDBeats();
-		//printf("looping...\n\r");
+		//LEDBeats();
+		Breathe();
 
 		TIM1->CTLR1 |= TIM_CEN;
 		// Wait until TIM1 is done with pulse
