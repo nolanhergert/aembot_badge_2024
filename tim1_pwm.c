@@ -4,6 +4,9 @@
  */
 
 #include "ch32v003fun.h"
+// Override default values for clock division
+	#define BASE_CFGR0 RCC_HPRE_DIV16 | RCC_PLLSRC_HSI_Mul2
+	#define HSI_VALUE          (1500000) //
 #include <stdio.h>
 #include "ch32v003_GPIO_branchless.h"
 
@@ -58,6 +61,7 @@ long map(long x, long in_min, long in_max, long out_min, long out_max) {
  */
 void t1pwm_setpw(uint8_t chl, uint16_t width)
 {
+	//width = MAX_PWM_VAL - width;
 	switch(chl&3)
 	{
 		case 0: TIM1->CH1CVR = width; break;
@@ -66,6 +70,7 @@ void t1pwm_setpw(uint8_t chl, uint16_t width)
 	}
 }
 
+uint16_t next_pwm_vals[NUM_LEDS] = {0};
 
 const long ms_in_minute = 60000;
 const long led_pulse_periods_ms[NUM_LEDS] = {ms_in_minute/50.4, ms_in_minute/50.2, ms_in_minute/50};
@@ -86,7 +91,7 @@ void LEDBeats() {
 
 		// Map "linear" to logarithmic value to match human vision
     pwm_value = CIE[pwm_value];
-    t1pwm_setpw(i, MAX_PWM_VAL-pwm_value);
+		next_pwm_vals[i] = MAX_PWM_VAL - pwm_value;
   }
 }
 
@@ -135,11 +140,11 @@ void Breathe() {
 		pwm_value = 0;
 	}
 
+	// Map "linear" to logarithmic value to match human vision
 	pwm_value = CIE[pwm_value];
 
   for (i = 0; i < NUM_LEDS; i++) {
-		// Map "linear" to logarithmic value to match human vision
-    t1pwm_setpw(i, MAX_PWM_VAL-pwm_value);
+		next_pwm_vals[i] = MAX_PWM_VAL - pwm_value;
   }
 }
 
@@ -211,7 +216,7 @@ void aemhead_init( void )
 	RCC->APB2PRSTR &= ~RCC_APB2Periph_TIM1;
 
 	// Prescaler
-	TIM1->PSC = 0x20;
+	TIM1->PSC = 0x4;
 
 	// Auto Reload - sets period
 	TIM1->ATRLR = MAX_PWM_VAL-1; // So off is actually off apparently
@@ -260,14 +265,45 @@ void increment_style_index() {
 	style_index = (style_index + 1) % (sizeof(styles) / sizeof(styles[0]));
 }
 
+void write_pwm_vals() {
+	for (i = 0; i < NUM_LEDS; i++) {
+		t1pwm_setpw(i, next_pwm_vals[i]);
+	}
+}
+
 // Intent is to have millis() == 0 after this function runs
 void reset_millis_offset() {
 	millis_start = SysTick->CNT / DELAY_MS_TIME;
 	deep_sleep_time_ms = 0;
 }
 
+void update_button_state() {
+	// Check style button state
+	// If user pressed the button, they must release it before pressing again
+	// (time held doesn't matter)
+	if (button_is_pressed == 0 &&
+			GPIO_digitalRead(GPIOv_from_PORT_PIN(GPIO_port_D, 0)) == high &&
+			millis() > (button_released_press_ms + BUTTON_DEBOUNCE_DELAY_MS))
+	{
+		button_is_pressed = 1;
+		increment_style_index();
+		// Start patterns at the beginning
+		reset_millis_offset();
+		button_started_press_ms = millis();
+	}
+	if (button_is_pressed == 1 &&
+			GPIO_digitalRead(GPIOv_from_PORT_PIN(GPIO_port_D, 0)) == low &&
+			millis() > (button_started_press_ms + BUTTON_DEBOUNCE_DELAY_MS))
+	{
+		button_is_pressed = 0;
+		button_released_press_ms = millis();
+	}
+}
+
 int main()
 {
+
+
 
 	SystemInit();
 	Delay_Ms( 1000 );
@@ -281,35 +317,19 @@ int main()
 	setup_deep_sleep();
 #endif
 	while(1) {
-		// Check style button state
-		// If user pressed the button, they must release it before pressing again
-		// (time held doesn't matter)
-		if (button_is_pressed == 0 &&
-		 		GPIO_digitalRead(GPIOv_from_PORT_PIN(GPIO_port_D, 0)) == high &&
-				millis() > (button_released_press_ms + BUTTON_DEBOUNCE_DELAY_MS))
-		{
-			button_is_pressed = 1;
-			increment_style_index();
-			// Start patterns at the beginning
-			reset_millis_offset();
-			button_started_press_ms = millis();
-		}
-		if (button_is_pressed == 1 &&
-				GPIO_digitalRead(GPIOv_from_PORT_PIN(GPIO_port_D, 0)) == low &&
-				millis() > (button_started_press_ms + BUTTON_DEBOUNCE_DELAY_MS))
-		{
-			button_is_pressed = 0;
-			button_released_press_ms = millis();
-		}
+		update_button_state();
 
-		// Determine next values of LEDs.
-		// Theoretically only MAX_PWM_VAL ticks of CPU available, but can
-		// increase cpu freq if needed
+		// Write pwm values into timer registers
+		write_pwm_vals();
+
+		// Enable timer1 (one-shot)
+		TIM1->CTLR1 |= TIM_CEN;
+
+		// Determine next values of LEDs for next awake period while
+		// timer is running
 		styles[style_index]();
 
-		TIM1->CTLR1 |= TIM_CEN;
 		// Wait until TIM1 is done with pulse
-		// Optionally sleep CPU and have end of pulse automatically go to deep sleep?
 		while (TIM1->CTLR1 & TIM_CEN);
 
 #ifdef DEEP_SLEEP
@@ -320,7 +340,7 @@ int main()
 		//
 		deep_sleep_time_ms += DEEP_SLEEP_TIME_MS;
 #else
-		Delay_Ms( 12500 );
+		Delay_Ms( DEEP_SLEEP_TIME_MS );
 #endif
 	}
 }
@@ -344,3 +364,6 @@ int main()
 
 // Nice to have
 //  * Save settings...https://github.com/cnlohr/ch32v003fun/pull/85 and https://github.com/recallmenot/ch32v003fun_wildwest/blob/main/lib%2Fch32v003_flash.h
+
+// Very not necessary:
+//  * Sleep CPU and have end of pulse automatically go to deep sleep?
