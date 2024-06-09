@@ -175,14 +175,11 @@ void setup_deep_sleep()
 
 	// select standby on power-down
 	PWR->CTLR |= PWR_CTLR_PDDS;
-}
 
-void enter_deep_sleep()
-{
 	// peripheral interrupt controller send to deep sleep
 	PFIC->SCTLR |= (1 << 2);
-
 }
+
 
 /*
  * initialize TIM1 for PWM
@@ -190,8 +187,47 @@ void enter_deep_sleep()
 void aemhead_init( void )
 {
 	// Enable GPIOC, GPIOD and TIM1
-	RCC->APB2PCENR |= 	RCC_APB2Periph_GPIOD | RCC_APB2Periph_GPIOC |
+	RCC->APB2PCENR |= 	RCC_APB2Periph_GPIOD | RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOA |
 						RCC_APB2Periph_TIM1;
+
+
+	// Set up defaults of all pins for lowest power standby
+	GPIOA->CFGLR = (GPIO_CNF_IN_PUPD<<(4*2)) |
+				   (GPIO_CNF_IN_PUPD<<(4*1));
+	GPIOA->BSHR = GPIO_BSHR_BS2 | GPIO_BSHR_BR1;
+	GPIOC->CFGLR = (GPIO_CNF_IN_PUPD<<(4*7)) |
+				   (GPIO_CNF_IN_PUPD<<(4*6)) |
+				   (GPIO_CNF_IN_PUPD<<(4*5)) |
+				   (GPIO_CNF_IN_PUPD<<(4*4)) |
+				   (GPIO_CNF_IN_PUPD<<(4*3)) |
+				   (GPIO_CNF_IN_PUPD<<(4*2)) |
+				   (GPIO_CNF_IN_PUPD<<(4*1)) |
+				   (GPIO_CNF_IN_PUPD<<(4*0));
+	GPIOC->BSHR = GPIO_BSHR_BS7 |
+				  GPIO_BSHR_BS6 |
+				  GPIO_BSHR_BS5 |
+				  GPIO_BSHR_BS4 |
+				  GPIO_BSHR_BS3 |
+				  GPIO_BSHR_BS2 |
+				  GPIO_BSHR_BS1 |
+				  GPIO_BSHR_BS0;
+	GPIOD->CFGLR = (GPIO_CNF_IN_PUPD<<(4*7)) |
+				   (GPIO_CNF_IN_PUPD<<(4*6)) |
+				   (GPIO_CNF_IN_PUPD<<(4*5)) |
+				   (GPIO_CNF_IN_PUPD<<(4*4)) |
+				   (GPIO_CNF_IN_PUPD<<(4*3)) |
+				   (GPIO_CNF_IN_PUPD<<(4*2)) |
+				   (GPIO_CNF_IN_PUPD<<(4*0));
+	GPIOD->BSHR = GPIO_BSHR_BS7 |
+				  GPIO_BSHR_BS6 |
+				  GPIO_BSHR_BS5 |
+				  GPIO_BSHR_BS4 |
+				  GPIO_BSHR_BS3 |
+				  GPIO_BSHR_BS2 |
+				  GPIO_BSHR_BS0;
+
+
+
 
 	// PD0 is BUTTON_STYLE, Input with pull-up/pull-down resistors
 	GPIOD->CFGLR &= ~(0xf<<(4*0));
@@ -303,11 +339,10 @@ void update_button_state() {
 
 int main()
 {
-
-
-
+	// Hold down style button when powering on in order to enter
+	// bootloader mode, which will accept flashing
+  Delay_Ms( 100);
 	SystemInit();
-	Delay_Ms( 1000 );
 
 	// init TIM1 for PWM
 	printf("initializing tim1...");
@@ -334,7 +369,7 @@ int main()
 		while (TIM1->CTLR1 & TIM_CEN);
 
 #ifdef DEEP_SLEEP
-		enter_deep_sleep();
+		// Go to sleep
 		__WFE();
 		// Restore clocks, etc
 		SystemInit();
@@ -347,14 +382,16 @@ int main()
 }
 
 // TODO before ship:
-//  * Set prescalar for TIM1 to 0 and adjust system clock to lower current draw. Need to make sure millis() still works. Propose millis() to charles?
-
+//  * Fix bootloader
 //  * Clean up unused code for clarity
 //  * Do computation of values in a function call so you can save them off for next boot. Meanwhile do one pulse of LED
 //  * Decide tabs/spaces
-//  * Bootloader should blink too, or just start program at high freq?
 //  * Make CIE table 1024 wide too?
 //  * Double check current draw during deep sleep. Turn off gpios?
+
+//  Patterns:
+//   * Shift like Alton
+//   * Something random but
 
 // Nice to have
 //  * Save settings...https://github.com/cnlohr/ch32v003fun/pull/85 and https://github.com/recallmenot/ch32v003fun_wildwest/blob/main/lib%2Fch32v003_flash.h
