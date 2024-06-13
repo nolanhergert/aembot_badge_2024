@@ -5,8 +5,9 @@
 
 #include "ch32v003fun.h"
 // Override default values for clock division
-	#define BASE_CFGR0 RCC_HPRE_DIV16 | RCC_PLLSRC_HSI_Mul2
-	#define HSI_VALUE          (1500000) //
+	#define BASE_CFGR0_ORIG RCC_HPRE_DIV1 | RCC_PLLSRC_HSI_Mul2
+	#define BASE_CFGR0_NEW RCC_HPRE_DIV16 | RCC_PLLSRC_HSI_Mul2
+	//#define HSI_VALUE          (1500000) //
 #include <stdio.h>
 #include "ch32v003_GPIO_branchless.h"
 
@@ -33,7 +34,8 @@ long deep_sleep_time_ms = 0;
 #define millis()  (SysTick->CNT / DELAY_MS_TIME - millis_start + deep_sleep_time_ms)
 
 // From https://gist.github.com/mathiasvr/19ce1d7b6caeab230934080ae1f1380e
-const uint16_t CIE[256] = {
+#define MAX_CIE_INDEX (256-1)
+const uint16_t CIE[MAX_CIE_INDEX+1] = {
     0,    0,    1,    1,    2,    2,    3,    3,    4,    4,    4,    5,    5,    6,    6,    7,
     7,    8,    8,    8,    9,    9,   10,   10,   11,   11,   12,   12,   13,   13,   14,   15,
    15,   16,   17,   17,   18,   19,   19,   20,   21,   22,   22,   23,   24,   25,   26,   27,
@@ -96,35 +98,6 @@ void LEDBeats() {
   }
 }
 
-/*
-// White Noise Generator State
-#define NOISE_BITS 8
-#define NOISE_MASK ((1<<NOISE_BITS)-1)
-#define NOISE_POLY_TAP0 31
-#define NOISE_POLY_TAP1 21
-#define NOISE_POLY_TAP2 1
-#define NOISE_POLY_TAP3 0
-uint32_t lfsr = 1;
-
-// random byte generator
-uint8_t rand8(void)
-{
-	uint8_t bit;
-	uint32_t new_data;
-
-	for(bit=0;bit<NOISE_BITS;bit++)
-	{
-		new_data = ((lfsr>>NOISE_POLY_TAP0) ^
-					(lfsr>>NOISE_POLY_TAP1) ^
-					(lfsr>>NOISE_POLY_TAP2) ^
-					(lfsr>>NOISE_POLY_TAP3));
-		lfsr = (lfsr<<1) | (new_data&1);
-	}
-
-	return lfsr&NOISE_MASK;
-}
-*/
-
 const long breath_period_ms = 10*1000;
 void Breathe() {
 	long timestamp = (millis()) % breath_period_ms;
@@ -149,6 +122,18 @@ void Breathe() {
   }
 }
 
+/*
+long sawtooth_time_index = 0;
+const long sawtooth_offsets[NUM_LEDS] = {0, MAX_CIE_INDEX/3, (2*MAX_CIE_INDEX)/3};
+void Sawtooth() {
+	// Just change value once per flash
+	sawtooth_time_index = (sawtooth_time_index + 1) % MAX_CIE_INDEX;
+
+	for (i = 0; i < NUM_LEDS; i++) {
+		next_pwm_vals[i] = CIE[(sawtooth_time_index + sawtooth_offsets[i]) % MAX_CIE_INDEX];
+  }
+}
+*/
 void setup_deep_sleep()
 {
 
@@ -339,14 +324,19 @@ void update_button_state() {
 
 int main()
 {
-	// Hold down style button when powering on in order to enter
-	// bootloader mode, which will accept flashing
-  Delay_Ms( 100);
+	// For now, run ../ch32v003fun/minichlink/minichlink -u to unbrick and wipe the flash
+	// so you can repogramH
+	// TODO: Would like to move to just holding down the style button to enter bootloader mode
+	//       when powering on but didn't get there in time
+
 	SystemInit();
 
 	// init TIM1 for PWM
 	printf("initializing tim1...");
 	aemhead_init();
+
+	//RCC->CFGR0 = BASE_CFGR0_NEW;
+
 
   reset_millis_offset();
 #ifdef DEEP_SLEEP
@@ -394,6 +384,7 @@ int main()
 //   * Something random but
 
 // Nice to have
+//  * Adjust brightness by holding down button. Adjusts prescalar from a few set values in a circular array. Set PWM brightness to max during this time?
 //  * Save settings...https://github.com/cnlohr/ch32v003fun/pull/85 and https://github.com/recallmenot/ch32v003fun_wildwest/blob/main/lib%2Fch32v003_flash.h
 
 // Very not necessary:
