@@ -374,14 +374,12 @@ int main()
 // TODO before ship:
 //  * Fix bootloader
 //  * Clean up unused code for clarity
-//  * Do computation of values in a function call so you can save them off for next boot. Meanwhile do one pulse of LED
 //  * Decide tabs/spaces
 //  * Make CIE table 1024 wide too?
-//  * Double check current draw during deep sleep. Turn off gpios?
 
 //  Patterns:
 //   * Shift like Alton
-//   * Something random but
+//   * Something random but not taxing
 
 // Nice to have
 //  * Adjust brightness by holding down button. Adjusts prescalar from a few set values in a circular array. Set PWM brightness to max during this time?
@@ -389,3 +387,4 @@ int main()
 
 // Very not necessary:
 //  * Sleep CPU and have end of pulse automatically go to deep sleep?
+//  * Save settings...https://github.com/cnlohr/ch32v003fun/pull/85 and https://github.com/recallmenot/ch32v003fun_wildwest/blob/main/lib%2Fch32v003_flash.h
