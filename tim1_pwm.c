@@ -372,19 +372,13 @@ int main()
 }
 
 // TODO before ship:
-//  * Fix bootloader
 //  * Clean up unused code for clarity
 //  * Decide tabs/spaces
-//  * Make CIE table 1024 wide too?
 
 //  Patterns:
-//   * Shift like Alton
+//   * Sawtooth like Alton
 //   * Something random but not taxing
 
 // Nice to have
 //  * Adjust brightness by holding down button. Adjusts prescalar from a few set values in a circular array. Set PWM brightness to max during this time?
-//  * Save settings...https://github.com/cnlohr/ch32v003fun/pull/85 and https://github.com/recallmenot/ch32v003fun_wildwest/blob/main/lib%2Fch32v003_flash.h
-
-// Very not necessary:
-//  * Sleep CPU and have end of pulse automatically go to deep sleep?
 //  * Save settings...https://github.com/cnlohr/ch32v003fun/pull/85 and https://github.com/recallmenot/ch32v003fun_wildwest/blob/main/lib%2Fch32v003_flash.h
