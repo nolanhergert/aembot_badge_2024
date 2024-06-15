@@ -332,7 +332,6 @@ int main()
 	SystemInit();
 
 	// init TIM1 for PWM
-	printf("initializing tim1...");
 	aemhead_init();
 
 	//RCC->CFGR0 = BASE_CFGR0_NEW;
