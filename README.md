@@ -1,3 +1,19 @@
+## Building/Flashing
+  * GFollow instructions for [ch32v003fun](https://github.com/cnlohr/ch32v003fun)
+  * Make sure switch is on 3.3V. Connect 3.3V, SWIO, and GND from WCH-LinkE to the board temporarily using a 3X1 header held in place using pressure from fingers.
+  * Unbrick CPU if needed (if already flashed before) by running:
+```
+> ch32v003/minichlink/minichlink -u
+```
+  * Flash bootloader if needed (not likely):
+```
+> ch32v003/minichlink/minichlink -w factory_bootloader.bin bootloader
+```
+  * Build and flash image:
+```
+> make
+```
+
 ## Requirements
   * Have 30-50 boards designed, produced, and flashed in time for team banquet. (6 weeks)
     * 3 weeks for board design "tape in"
